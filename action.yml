@@ -1,0 +1,52 @@
+name: 'Update Deployment Status'
+description: 'Create a deployment and update its status using a GitHub App'
+inputs:
+  app_id:
+    description: 'The ID of your GitHub App'
+    required: true
+  app_private_key:
+    description: 'The private key of your GitHub App'
+    required: true
+  environment:
+    description: 'The name of the environment being deployed to'
+    required: true
+    default: 'production'
+  state:
+    description: 'The state of the deployment (success, failure, error, inactive)'
+    required: true
+    default: 'success'
+  description:
+    description: 'A short description of the status'
+    required: false
+    default: 'Deployment finished'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate App Token
+      id: generate_token
+      uses: tibdex/github-app-token@v1
+      with:
+        app_id: ${{ inputs.app_id }}
+        private_key: ${{ inputs.app_private_key }}
+
+    - name: Update Deployment Status
+      uses: actions/github-script@v6
+      with:
+        github-token: ${{ steps.generate_token.outputs.token }}
+        script: |
+          const deployment = await github.rest.repos.createDeployment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: context.sha,
+            environment: '${{ inputs.environment }}',
+            auto_merge: false
+          });
+
+          await github.rest.repos.createDeploymentStatus({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            deployment_id: deployment.data.id,
+            state: '${{ inputs.state }}',
+            description: '${{ inputs.description }}'
+          });
